@@ -525,4 +525,6 @@ MonoBehaviour:
   moveSpeed: 6
   jumpHeight: 400
   cam: {fileID: 963194227}
-  turnSpeed: 25
+  turnSpeed: 15
+  minX: -45
+  maxX: 45
