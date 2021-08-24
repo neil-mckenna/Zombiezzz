@@ -11,6 +11,9 @@ public class FirstPersonController : MonoBehaviour
     Rigidbody myRb;
     CapsuleCollider myCol;
 
+    [Header("Animation Settings")]
+    public Animator myAnim;
+
     [Header("Camera Settings")]
     public Camera cam;
     public float turnSpeed = 5f;
@@ -37,6 +40,22 @@ public class FirstPersonController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if(Input.GetKeyDown(KeyCode.F))
+        {
+            myAnim.SetBool("arm", !myAnim.GetBool("arm"));
+        }
+
+        if(Input.GetKeyDown(KeyCode.R))
+        {
+            myAnim.SetTrigger("reload");
+        }
+
+        if(Input.GetMouseButtonDown(0))
+        {
+            myAnim.SetTrigger("fire");
+        }
+        
+        
         
     }
 
