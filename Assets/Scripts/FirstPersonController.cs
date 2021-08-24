@@ -13,6 +13,14 @@ public class FirstPersonController : MonoBehaviour
 
     [Header("Animation Settings")]
     public Animator myAnim;
+    public Transform gunHandPosition;
+    public GameObject currentGun;
+
+    [Header("Audio Settings")]
+    public AudioSource[] footsteps;
+    [SerializeField] [Range(0.1f, 2.0f)] float footStepInterval = 0.4f;
+    public AudioSource jumpSFX;
+    public AudioSource landSFX;
 
     [Header("Camera Settings")]
     public Camera cam;
@@ -26,6 +34,13 @@ public class FirstPersonController : MonoBehaviour
     bool cursorIsLocked = true;
     bool lockCursor = true;
 
+    
+    //instance variables
+
+    float delta = 0.0f;
+    float x = 0f;
+    float y = 0f;
+
 
     // Start is called before the first frame update
     void Start()
@@ -35,11 +50,38 @@ public class FirstPersonController : MonoBehaviour
 
         camRot = cam.transform.localRotation;
         playerRot = transform.localRotation;
+
+        currentGun.transform.SetParent(gunHandPosition);
+        
+
     }
 
     // Update is called once per frame
     void Update()
     {
+
+        if(Mathf.Abs(x) > 0.0f || Mathf.Abs(y) > 0.0f)
+        {
+            if(!myAnim.GetBool("running"))
+            {
+                myAnim.SetBool("running", true);
+                InvokeRepeating(nameof(PlayFootStepAudio), 0f, footStepInterval);
+            }
+        }
+        else if (!myAnim.GetBool("running"))
+        {
+            myAnim.SetBool("running", false);
+            CancelInvoke(nameof(PlayFootStepAudio));
+            
+        }
+        else
+        {
+            myAnim.SetBool("running", false);
+            CancelInvoke(nameof(PlayFootStepAudio));
+            
+        }
+
+
         if(Input.GetKeyDown(KeyCode.F))
         {
             myAnim.SetBool("arm", !myAnim.GetBool("arm"));
@@ -52,19 +94,42 @@ public class FirstPersonController : MonoBehaviour
 
         if(Input.GetMouseButtonDown(0))
         {
-            myAnim.SetTrigger("fire");
+            myAnim.SetTrigger("fire"); 
         }
-        
-        
-        
+
+
+        // Jump Logic
+        if(Input.GetKeyDown(KeyCode.Space) && isGrounded())
+        {
+            myRb.AddForce(0, jumpHeight, 0);
+            jumpSFX.Play();
+            if(myAnim.GetBool("running"))
+            {
+                CancelInvoke(nameof(PlayFootStepAudio));
+            }
+        }
+          
+    }
+
+    void PlayFootStepAudio()
+    {
+        AudioSource audioSource = new AudioSource();
+
+        int n = Random.Range(1, footsteps.Length);
+
+        audioSource = footsteps[n];
+        audioSource.Play();
+        footsteps[n] = footsteps[0];
+        footsteps[0] = audioSource;
+
     }
 
     void FixedUpdate()
     {
         // Movement Logic
-        float delta = Time.deltaTime;
-        float x = Input.GetAxis("Horizontal") * delta * moveSpeed;
-        float y = Input.GetAxis("Vertical") * delta * moveSpeed;
+        delta = Time.deltaTime;
+        x = Input.GetAxis("Horizontal") * delta * moveSpeed;
+        y = Input.GetAxis("Vertical") * delta * moveSpeed;
         
         transform.position += cam.transform.forward * y  + cam.transform.right * x;
         
@@ -80,12 +145,6 @@ public class FirstPersonController : MonoBehaviour
         transform.localRotation = playerRot;
         cam.transform.localRotation = camRot;
 
-
-        // Jump Logic
-        if(Input.GetKeyDown(KeyCode.Space) && isGrounded())
-        {
-            myRb.AddForce(0, jumpHeight, 0);
-        }
 
         // Cursor Check
         UpdateCursorLock();
@@ -119,6 +178,21 @@ public class FirstPersonController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private void OnCollisionEnter(Collision other) 
+    {
+        if(isGrounded())
+        {
+            landSFX.Play();
+
+            if(myAnim.GetBool("running"))
+            {
+                InvokeRepeating(nameof(PlayFootStepAudio), 0f, footStepInterval);
+            }
+            
+        }
+        
     }
 
     public void SetCursorLock(bool value)
@@ -162,11 +236,6 @@ public class FirstPersonController : MonoBehaviour
 
         }
     }
-
-
-
-    
-
 
 
 }
