@@ -21,6 +21,14 @@ public class FirstPersonController : MonoBehaviour
     [SerializeField] [Range(0.1f, 2.0f)] float footStepInterval = 0.4f;
     public AudioSource jumpSFX;
     public AudioSource landSFX;
+    public AudioSource incDamageSFX;
+    public AudioSource deathSFX;
+    public AudioSource reloadSFX;
+
+    [Header("Pickups")]
+    public AudioSource ammoPickupSFX;
+    public AudioSource healthPickupSFX;
+    public AudioSource triggerSFX;
 
     [Header("Camera Settings")]
     public Camera cam;
@@ -34,12 +42,28 @@ public class FirstPersonController : MonoBehaviour
     bool cursorIsLocked = true;
     bool lockCursor = true;
 
+    bool playingRunning = false;
+    bool previouslyGrounded = true;
+
     
     //instance variables
 
     float delta = 0.0f;
     float x = 0f;
     float y = 0f;
+
+    // Inventory
+    int ammo = 0;
+    int maxAmmo = 48;
+
+    int health = 10;
+    int maxHealth = 100;
+
+    int ammoClip = 0;
+    int ammoMaxClip = 10;
+
+    int ammoDesired = 0;
+    int ammoSupply = 0;
 
 
     // Start is called before the first frame update
@@ -78,6 +102,7 @@ public class FirstPersonController : MonoBehaviour
         {
             myAnim.SetBool("running", false);
             CancelInvoke(nameof(PlayFootStepAudio));
+            playingRunning = false;
             
         }
 
@@ -87,27 +112,55 @@ public class FirstPersonController : MonoBehaviour
             myAnim.SetBool("arm", !myAnim.GetBool("arm"));
         }
 
-        if(Input.GetKeyDown(KeyCode.R))
+        if(Input.GetKeyDown(KeyCode.R) && myAnim.GetBool("arm"))
         {
             myAnim.SetTrigger("reload");
+
+            reloadSFX.Play();
+
+            ammoDesired = ammoMaxClip - ammoClip;
+            ammoSupply = ammoDesired < ammo ? ammoDesired : ammo;
+            
+            ammo -= ammoSupply;
+            ammoClip += ammoSupply; 
+
+            Debug.Log("Ammo Left: " + ammo);
+            Debug.Log("Ammo in clip " + ammoClip);
+            
         }
 
-        if(Input.GetMouseButtonDown(0))
+        if(Input.GetMouseButtonDown(0) && !myAnim.GetBool("fire"))
         {
-            myAnim.SetTrigger("fire"); 
+            if(ammoClip > 0f ) 
+            {
+                myAnim.SetTrigger("fire"); 
+                ammoClip--;
+                Debug.LogWarning("Ammo in clip " + ammoClip);
+            }
+            else if(myAnim.GetBool("arm"))
+            {
+                triggerSFX.Play();
+            }
         }
-
 
         // Jump Logic
-        if(Input.GetKeyDown(KeyCode.Space) && isGrounded())
+        bool grounded = isGrounded();
+        if(Input.GetKeyDown(KeyCode.Space) && grounded)
         {
             myRb.AddForce(0, jumpHeight, 0);
             jumpSFX.Play();
             if(myAnim.GetBool("running"))
             {
                 CancelInvoke(nameof(PlayFootStepAudio));
+                playingRunning = false;
             }
         }
+        else if(!previouslyGrounded && grounded)
+        {
+            landSFX.Play();
+        }
+
+        previouslyGrounded = grounded;
           
     }
 
@@ -121,6 +174,7 @@ public class FirstPersonController : MonoBehaviour
         audioSource.Play();
         footsteps[n] = footsteps[0];
         footsteps[0] = audioSource;
+        playingRunning = true;
 
     }
 
@@ -180,20 +234,7 @@ public class FirstPersonController : MonoBehaviour
         return false;
     }
 
-    private void OnCollisionEnter(Collision other) 
-    {
-        if(isGrounded())
-        {
-            landSFX.Play();
-
-            if(myAnim.GetBool("running"))
-            {
-                InvokeRepeating(nameof(PlayFootStepAudio), 0f, footStepInterval);
-            }
-            
-        }
-        
-    }
+    
 
     public void SetCursorLock(bool value)
     {
@@ -234,6 +275,55 @@ public class FirstPersonController : MonoBehaviour
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
+        }
+    }
+
+
+    // Collisions
+    private void OnCollisionEnter(Collision other) 
+    {
+        if(isGrounded())
+        {
+
+            if(myAnim.GetBool("running") && !playingRunning)
+            {
+                InvokeRepeating(nameof(PlayFootStepAudio), 0f, footStepInterval);
+            }   
+        }
+
+        if(other.gameObject.CompareTag("Ammo") && ammo < maxAmmo)
+        {
+            Destroy(other.gameObject);
+            ammo =  Mathf.Clamp(ammo + 12, 0, maxAmmo);
+            ammoPickupSFX.Play();
+
+            
+            Debug.Log("Got " + ammo + " ammo");
+        }
+
+        if(other.gameObject.CompareTag("MedKit") && health < maxHealth)
+        {
+            Destroy(other.gameObject);
+            health = Mathf.Clamp(health + 50, 0, maxHealth);
+            healthPickupSFX.Play();
+
+            Debug.Log("Got " + health + " hp");
+        }
+
+        if(other.gameObject.CompareTag("Lava"))
+        {
+            health -= 10;
+            if(health <= 0)
+            {
+                deathSFX.Play();
+                health = 0;
+            }
+            else
+            {
+                incDamageSFX.Play();
+            }
+
+            Debug.Log("Got " + health + " hp");   
         }
     }
 
